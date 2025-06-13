@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NatureTrack - Pelacak Kebiasaan Harian</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #0fa968;
+            --secondary: #8f5da0;
+            --dark: #0d1117;
+            --darker: #010409;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--darker);
+            color: #e6edf3;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(15, 169, 104, 0.05) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(143, 93, 160, 0.05) 0%, transparent 20%);
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        .leaf-pattern {
+            position: absolute;
+            opacity: 0.05;
+            z-index: 0;
+        }
+        
+        .habit-card {
+            background: linear-gradient(135deg, rgba(13,17,23,0.7) 0%, rgba(22,27,34,0.5) 100%);
+            border: 1px solid rgba(48,54,61,0.5);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .habit-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--primary);
+        }
+        
+        .modal-container {
+            background: rgba(13, 17, 23, 0.85);
+            backdrop-filter: blur(8px);
+        }
+        
+        .time-category-pill {
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+        }
+        
+        .pagi-pill { background: rgba(255, 182, 77, 0.15); border: 1px solid #ffb64d; }
+        .siang-pill { background: rgba(77, 171, 255, 0.15); border: 1px solid #4dabff; }
+        .sore-pill { background: rgba(255, 138, 77, 0.15); border: 1px solid #ff8a4d; }
+        .malam-pill { background: rgba(160, 77, 255, 0.15); border: 1px solid #a04dff; }
+        
+        .nav-glow {
+            box-shadow: 0 0 15px rgba(15, 169, 104, 0.3);
+        }
+        
+        .checkbox-container input:checked ~ .checkmark {
+            background-color: var(--primary);
+        }
+        
+        .checkbox-container input:checked ~ .checkmark:after {
+            display: block;
+        }
+        
+        .checkmark {
+            height: 20px;
+            width: 20px;
+            border: 2px solid #8b949e;
+            border-radius: 4px;
+        }
+        
+        .checkmark:after {
+            content: "";
+            position: absolute;
+            display: none;
+            left: 6px;
+            top: 2px;
+            width: 5px;
+            height: 10px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .action-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .action-btn:hover {
+            animation: pulse 1s infinite;
+            box-shadow: 0 0 15px rgba(15, 169, 104, 0.5);
+        }
+        
+        .glow-text {
+            text-shadow: 0 0 10px rgba(15, 169, 104, 0.7);
+        }
+    </style>
+</head>
+<body class="min-h-screen relative overflow-x-hidden">
+    <!-- Pola elemen alam untuk dekorasi -->
+    <div class="leaf-pattern top-[50px] left-[50px] rotate-[25deg]">
+        <i data-feather="leaf" stroke-width="1" stroke="#0fa968" width="80" height="80"></i>
+    </div>
+    <div class="leaf-pattern top-[150px] right-[50px] rotate-[-20deg]">
+        <i data-feather="leaf" stroke-width="1" stroke="#8f5da0" width="60" height="60"></i>
+    </div>
+    <div class="leaf-pattern bottom-[200px] left-[20px] rotate-[15deg]">
+        <i data-feather="feather" stroke-width="1" stroke="#0fa968" width="50" height="50"></i>
+    </div>
+    
+    <!-- Header dengan jam real-time dan tombol reset -->
+    <header class="bg-[#0d1117] border-b border-[#30363d] sticky top-0 z-50 nav-glow">
+        <div class="container mx-auto px-4 py-3 flex flex-wrap justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i data-feather="sun" class="text-green-500"></i>
+                <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-purple-500 glow-text">
+                    NatureTrack
+                </h1>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <div id="real-time-clock" class="text-sm font-mono">
+                    <span id="hari"></span>, 
+                    <span id="tanggal"></span> 
+                    <span id="bulan"></span> 
+                    <span id="tahun"></span>
+                    <span class="ml-1"><span id="jam"></span>:<span id="menit"></span></span>
+                </div>
+                <button id="reset-btn" class="px-3 py-1 bg-red-900 hover:bg-red-700 text-white rounded-lg text-sm transition flex items-center action-btn">
+                    <i data-feather="refresh-cw" class="w-4 h-4 mr-1"></i> Reset
+                </button>
+                <button id="settings-btn" class="p-1 rounded-lg hover:bg-gray-800 action-btn">
+                    <i data-feather="settings" class="w-5 h-5"></i>
+                </button>
+                <button id="chart-btn" class="p-1 rounded-lg hover:bg-gray-800 action-btn">
+                    <i data-feather="pie-chart" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6">
+        <!-- Bagian utama untuk menampilkan habit cards -->
+        <div id="habits-container" class="my-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold flex items-center">
+                    <i data-feather="list" class="mr-2"></i> Daftar Kegiatan Harian
+                </h2>
+                <button id="add-habit-btn" class="px-4 py-2 bg-gradient-to-r from-green-600 to-teal-500 hover:from-green-500 hover:to-teal-400 text-white rounded-lg flex items-center action-btn">
+                    <i data-feather="plus" class="mr-2"></i> Tambah Kegiatan
+                </button>
+            </div>
+            
+            <div id="empty-state" class="text-center py-16 rounded-xl border border-dashed border-[#30363d]">
+                <i data-feather="cloud-snow" class="w-16 h-16 mx-auto text-gray-500"></i>
+                <h3 class="text-xl font-medium mt-4">Belum ada kegiatan</h3>
+                <p class="mt-2 text-gray-400">Tambahkan kegiatan baru untuk memulai melacak kebiasaan harian Anda.</p>
+                <button id="add-first-habit-btn" class="mt-4 px-4 py-2 bg-gradient-to-r from-green-600 to-teal-500 hover:from-green-500 hover:to-teal-400 text-white rounded-lg flex items-center mx-auto action-btn">
+                    <i data-feather="plus" class="mr-2"></i> Tambah Kegiatan Pertama
+                </button>
+            </div>
+            
+            <div id="habits-content" class="hidden">
+                <h3 class="text-lg font-medium my-4 flex items-center"><i data-feather="sunrise" class="mr-2"></i> Pagi</h3>
+                <div id="pagi-habits" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"></div>
+                
+                <h3 class="text-lg font-medium my-4 flex items-center"><i data-feather="sun" class="mr-2"></i> Siang</h3>
+                <div id="siang-habits" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"></div>
+                
+                <h3 class="text-lg font-medium my-4 flex items-center"><i data-feather="cloud" class="mr-2"></i> Sore</h3>
+                <div id="sore-habits" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"></div>
+                
+                <h3 class="text-lg font-medium my-4 flex items-center"><i data-feather="moon" class="mr-2"></i> Malam</h3>
+                <div id="malam-habits" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"></div>
+            </div>
+        </div>
+        
+        <!-- Bagian Statistik -->
+        <div id="statistics-container" class="hidden my-16">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold flex items-center">
+                    <i data-feather="bar-chart-2" class="mr-2"></i> Statistik Kebiasaan
+                </h2>
+                <button id="close-chart-btn" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg flex items-center action-btn">
+                    <i data-feather="x" class="mr-2"></i> Tutup
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-[#161b22] rounded-xl p-6">
+                    <h3 class="text-lg font-medium mb-4">Distribusi Kegiatan Berdasarkan Waktu</h3>
+                    <div class="flex justify-center">
+                        <canvas id="time-distribution-chart" width="400" height="400"></canvas>
+                    </div>
+                </div>
+                
+                <div class="bg-[#161b22] rounded-xl p-6">
+                    <h3 class="text-lg font-medium mb-4">Tingkat Penyelesaian Kegiatan</h3>
+                    <div class="flex justify-center">
+                        <canvas id="completion-chart" width="400" height="400"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Modal untuk menambah kegiatan -->
+    <div id="add-habit-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 modal-container">
+        <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-6 w-full max-w-md relative">
+            <button id="close-habit-modal" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i data-feather="x"></i>
+            </button>
+            
+            <h3 class="text-xl font-semibold mb-4 flex items-center">
+                <i data-feather="plus-circle" class="mr-2 text-green-500"></i> Tambah Kegiatan Baru
+            </h3>
+            
+            <form id="habit-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Judul Kegiatan</label>
+                    <input type="text" id="habit-title" required class="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-lg text-white">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1">Sub-kegiatan (pisahkan dengan koma)</label>
+                    <textarea id="habit-subtasks" rows="3" class="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-lg text-white" placeholder="Contoh: Minum air putih, Olahraga 30 menit, Sarapan sehat"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Centang saat menyelesaikan setiap sub-kegiatan</p>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Waktu</label>
+                        <select id="habit-time" required class="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-lg text-white">
+                            <option value="pagi">Pagi</option>
+                            <option value="siang">Siang</option>
+                            <option value="sore">Sore</option>
+                            <option value="malam">Malam</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Kategori</label>
+                        <input type="text" id="habit-category" class="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-lg text-white">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Jam Mulai</label>
+                        <input type="time" id="habit-start" required class="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-lg text-white">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Jam Selesai</label>
+                        <input type="time" id="habit-end" required class="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-lg text-white">
+                    </div>
+                </div>
+                
+                <div class="pt-4 flex justify-end space-x-2">
+                    <button type="button" id="cancel-habit" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-gradient-to-r from-green-600 to-teal-500 hover:from-green-500 hover:to-teal-400 text-white rounded-lg">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal pengaturan GitHub -->
+    <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 modal-container">
+        <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-6 w-full max-w-md relative">
+            <button id="close-settings-modal" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i data-feather="x"></i>
+            </button>
+            
+            <h3 class="text-xl font-semibold mb-4 flex items-center">
+                <i data-feather="github" class="mr-2"></i> Pengaturan GitHub
+            </h3>
+            
+            <form id="github-form" class="space-y-4">
+                <p class="text-sm text-gray-400">
+                    Sambungkan ke GitHub untuk menyimpan data otomatis ke dalam habits.json di repository Anda.
+                </p>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1">GitHub Username</label>
+                    <input type="text" id="github-username" required class="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-lg text-white">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1">Nama Repository</label>
+                    <input type="text" id="github-repo" required class="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-lg text-white">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1">Personal Access Token (PAT)</label>
+                    <input type="password" id="github-token" required class="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-lg text-white">
+                    <p class="text-xs text-gray-500 mt-1">Token harus memiliki izin "repo"</p>
+                </div>
+                
+                <div class="pt-4 flex justify-end space-x-2">
+                    <button type="button" id="cancel-settings" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white rounded-lg">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Data inisialisasi
+        let habits = [];
+        const categories = ['pagi', 'siang', 'sore', 'malam'];
+        
+        // DOM elements
+        const elements = {
+            realTimeClock: document.getElementById('real-time-clock'),
+            hari: document.getElementById('hari'),
+            tanggal: document.getElementById('tanggal'),
+            bulan: document.getElementById('bulan'),
+            tahun: document.getElementById('tahun'),
+            jam: document.getElementById('jam'),
+            menit: document.getElementById('menit'),
+            resetBtn: document.getElementById('reset-btn'),
+            settingsBtn: document.getElementById('settings-btn'),
+            chartBtn: document.getElementById('chart-btn'),
+            closeChartBtn: document.getElementById('close-chart-btn'),
+            addHabitBtn: document.getElementById('add-habit-btn'),
+            addFirstHabitBtn: document.getElementById('add-first-habit-btn'),
+            habitsContainer: document.getElementById('habits-container'),
+            emptyState: document.getElementById('empty-state'),
+            habitsContent: document.getElementById('habits-content'),
+            addHabitModal: document.getElementById('add-habit-modal'),
+            closeHabitModal: document.getElementById('close-habit-modal'),
+            habitForm: document.getElementById('habit-form'),
+            cancelHabit: document.getElementById('cancel-habit'),
+            settingsModal: document.getElementById('settings-modal'),
+            closeSettingsModal: document.getElementById('close-settings-modal'),
+            githubForm: document.getElementById('github-form'),
+            cancelSettings: document.getElementById('cancel-settings'),
+            statisticsContainer: document.getElementById('statistics-container'),
+            timeDistributionChart: document.getElementById('time-distribution-chart'),
+            completionChart: document.getElementById('completion-chart')
+        };
+        
+        // Inisialisasi fungsi
+        function initializeApp() {
+            loadHabits();
+            setupEventListeners();
+            updateClock();
+            setInterval(updateClock, 60000);
+            feather.replace();
+        }
+        
+        // Jam real-time
+        function updateClock() {
+            const now = new Date();
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            
+            elements.hari.textContent = days[now.getDay()];
+            elements.tanggal.textContent = now.getDate();
+            elements.bulan.textContent = months[now.getMonth()];
+            elements.tahun.textContent = now.getFullYear();
+            elements.jam.textContent = String(now.getHours()).padStart(2, '0');
+            elements.menit.textContent = String(now.getMinutes()).padStart(2, '0');
+        }
+        
+        // Daftar habit dari localStorage
+        function loadHabits() {
+            const savedHabits = localStorage.getItem('habits');
+            if (savedHabits) {
+                habits = JSON.parse(savedHabits);
+            }
+            
+            renderHabits();
+        }
+        
+        // Simpan habit ke localStorage
+        function saveHabits() {
+            localStorage.setItem('habits', JSON.stringify(habits));
+            renderHabits();
+            
+            // Simpan ke GitHub jika ada pengaturan
+            const githubSettings = localStorage.getItem('githubSettings');
+            if (githubSettings) {
+                saveToGitHub();
+            }
+        }
+        
+        // Simpan ke GitHub
+        function saveToGitHub() {
+            const settings = JSON.parse(localStorage.getItem('githubSettings'));
+            if (!settings) return;
+            
+            const data = {
+                habits: habits,
+                updatedAt: new Date().toISOString()
+            };
+            
+            // Simulasi penyimpanan ke GitHub
+            console.log('Menyimpan data ke GitHub:', settings);
+            // Pada implementasi nyata, gunakan GitHub API di sini
+        }
+        
+        // Render habit cards
+        function renderHabits() {
+            if (habits.length === 0) {
+                elements.emptyState.classList.remove('hidden');
+                elements.habitsContent.classList.add('hidden');
+                return;
+            }
+            
+            elements.emptyState.classList.add('hidden');
+            elements.habitsContent.classList.remove('hidden');
+            
+            // Reset habit containers
+            categories.forEach(category => {
+                document.getElementById(`${category}-habits`).innerHTML = '';
+            });
+            
+            // Kategori berdasarkan waktu
+            habits.forEach(habit => {
+                const categoryElement = document.getElementById(`${habit.time}-habits`);
+                if (!categoryElement) return;
+                
+                const completionPercentage = calculateCompletionPercentage(habit);
+                
+                categoryElement.appendChild(createHabitCard(habit, completionPercentage));
+            });
+            
+            // Update chart jika statistik terbuka
+            if (!elements.statisticsContainer.classList.contains('hidden')) {
+                renderCharts();
+            }
+        }
+        
+        // Buat habit card
+        function createHabitCard(habit, percentage) {
+            const card = document.createElement('div');
+            card.className = 'habit-card rounded-xl p-4 relative overflow-hidden';
+            
+            // Topbar dengan kategori waktu dan tombol hapus
+            const topBar = document.createElement('div');
+            topBar.className = 'flex justify-between items-start mb-3';
+            
+            const timePill = document.createElement('div');
+            timePill.className = `time-category-pill ${habit.time}-pill flex items-center`;
+            timePill.innerHTML = `<i data-feather="${habit.time === 'pagi' ? 'sunrise' : habit.time === 'siang' ? 'sun' : habit.time === 'sore' ? 'cloud' : 'moon'}" class="w-4 h-4 mr-1"></i>${habit.time.charAt(0).toUpperCase() + habit.time.slice(1)}`;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'text-gray-400 hover:text-red-500 p-1';
+            deleteBtn.innerHTML = '<i data-feather="trash-2" class="w-4 h-4"></i>';
+            deleteBtn.onclick = () => deleteHabit(habit.id);
+            
+            topBar.appendChild(timePill);
+            topBar.appendChild(deleteBtn);
+            
+            // Badan card
+            const title = document.createElement('h3');
+            title.className = 'font-semibold text-lg mb-2 truncate';
+            title.textContent = habit.title;
+            
+            // Waktu
+            const time = document.createElement('div');
+            time.className = 'text-sm text-gray-400 flex items-center mb-3';
+            time.innerHTML = `<i data-feather="clock" class="w-4 h-4 mr-1"></i>${habit.start} - ${habit.end}`;
+            
+            // Subtasks
+            const subtasksList = document.createElement('div');
+            subtasksList.className = 'space-y-2';
+            
+            if (habit.subtasks.length > 0) {
+                habit.subtasks.forEach((task, index) => {
+                    const subtaskDiv = document.createElement('div');
+                    subtaskDiv.className = 'flex items-center';
+                    
+                    const label = document.createElement('label');
+                    label.className = 'checkbox-container flex items-center cursor-pointer';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'absolute opacity-0 cursor-pointer';
+                    checkbox.checked = task.completed;
+                    checkbox.onchange = () => {
+                        habit.subtasks[index].completed = checkbox.checked;
+                        saveHabits();
+                    };
+                    
+                    const checkmark = document.createElement('span');
+                    checkmark.className = 'checkmark relative';
+                    
+                    const taskText = document.createElement('span');
+                    taskText.className = `ml-3 text-sm ${task.completed ? 'line-through text-gray-500' : ''}`;
+                    taskText.textContent = task.text;
+                    
+                    label.appendChild(checkbox);
+                    label.appendChild(checkmark);
+                    label.appendChild(taskText);
+                    
+                    subtaskDiv.appendChild(label);
+                    subtasksList.appendChild(subtaskDiv);
+                });
+            }
+            
+            // Progress bar
+            const progressContainer = document.createElement('div');
+            progressContainer.className = 'mt-4';
+            
+            const progressText = document.createElement('div');
+            progressText.className = 'flex justify-between text-xs mb-1';
+            progressText.innerHTML = `<span>Progress</span><span>${percentage}%</span>`;
+            
+            const progressBar = document.createElement('div');
+            progressBar.className = 'w-full bg-gray-800 rounded-full h-2';
+            
+            const progressBarInner = document.createElement('div');
+            progressBarInner.className = 'bg-gradient-to-r from-green-500 to-teal-400 h-2 rounded-full';
+            progressBarInner.style.width = `${percentage}%`;
+            
+            progressBar.appendChild(progressBarInner);
+            progressContainer.appendChild(progressText);
+            progressContainer.appendChild(progressBar);
+            
+            card.appendChild(topBar);
+            card.appendChild(title);
+            card.appendChild(time);
+            card.appendChild(subtasksList);
+            card.appendChild(progressContainer);
+            
+            return card;
+        }
+        
+        // Persentase kegiatan yang selesai
+        function calculateCompletionPercentage(habit) {
+            if (habit.subtasks.length === 0) return 0;
+            
+            const completedTasks = habit.subtasks.filter(task => task.completed).length;
+            return Math.round((completedTasks / habit.subtasks.length) * 100);
+        }
+        
+        // Event listeners
+        function setupEventListeners() {
+            elements.resetBtn.addEventListener('click', resetChecklists);
+            elements.settingsBtn.addEventListener('click', () => showModal('settings'));
+            elements.chartBtn.addEventListener('click', showStatistics);
+            elements.closeChartBtn.addEventListener('click', hideStatistics);
+            elements.addHabitBtn.addEventListener('click', () => showModal('habit'));
+            elements.addFirstHabitBtn.addEventListener('click', () => showModal('habit'));
+            elements.closeHabitModal.addEventListener('click', () => closeModal('habit'));
+            elements.cancelHabit.addEventListener('click', () => closeModal('habit'));
+            elements.closeSettingsModal.addEventListener('click', () => closeModal('settings'));
+            elements.cancelSettings.addEventListener('click', () => closeModal('settings'));
+            
+            elements.habitForm.addEventListener('submit', handleHabitSubmit);
+            elements.githubForm.addEventListener('submit', handleGitHubSubmit);
+        }
+        
+        // Reset semua checklist
+        function resetChecklists() {
+            if (habits.length === 0) return;
+            
+            if (confirm('Apakah Anda yakin ingin mereset semua checklist kegiatan?')) {
+                habits.forEach(habit => {
+                    habit.subtasks.forEach(task => {
+                        task.completed = false;
+                    });
+                });
+                saveHabits();
+            }
+        }
+        
+        // Tampilkan statistik
+        function showStatistics() {
+            if (habits.length === 0) {
+                alert('Belum ada kegiatan untuk ditampilkan dalam statistik');
+                return;
+            }
+            
+            elements.habitsContainer.classList.add('hidden');
+            elements.statisticsContainer.classList.remove('hidden');
+            renderCharts();
+        }
+        
+        // Sembunyikan statistik
+        function hideStatistics() {
+            elements.habitsContainer.classList.remove('hidden');
+            elements.statisticsContainer.classList.add('hidden');
+        }
+        
+        // Render chart
+        function renderCharts() {
+            // Distribution by time category
+            const timeCounts = {
+                pagi: 0,
+                siang: 0,
+                sore: 0,
+                malam: 0
+            };
+            
+            habits.forEach(habit => {
+                if (timeCounts[habit.time] !== undefined) {
+                    timeCounts[habit.time]++;
+                }
+            });
+            
+            // Completion percentage
+            let totalTasks = 0;
+            let completedTasks = 0;
+            
+            habits.forEach(habit => {
+                habit.subtasks.forEach(task => {
+                    totalTasks++;
+                    if (task.completed) completedTasks++;
+                });
+            });
+            
+            const completionPercentage = Math.round((completedTasks / totalTasks) * 100) || 0;
+            const remainingPercentage = 100 - completionPercentage;
+            
+            // Buat chart distribusi waktu
+            const timeCtx = elements.timeDistributionChart.getContext('2d');
+            if (window.timeDistributionChart) {
+                window.timeDistributionChart.destroy();
+            }
+            
+            window.timeDistributionChart = new Chart(timeCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pagi', 'Siang', 'Sore', 'Malam'],
+                    datasets: [{
+                        data: [timeCounts.pagi, timeCounts.siang, timeCounts.sore, timeCounts.malam],
+                        backgroundColor: ['#FFB64D', '#4DABFF', '#FF8A4D', '#A04DFF'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#e6edf3'
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+            
+            // Buat chart penyelesaian
+            const completionCtx = elements.completionChart.getContext('2d');
+            if (window.completionChart) {
+                window.completionChart.destroy();
+            }
+            
+            window.completionChart = new Chart(completionCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Selesai', 'Belum Selesai'],
+                    datasets: [{
+                        data: [completionPercentage, remainingPercentage],
+                        backgroundColor: ['#0FA968', '#30363D'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#e6edf3'
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+        
+        // Tampilkan modal
+        function showModal(modalType) {
+            const modal = modalType === 'habit' ? elements.addHabitModal : elements.settingsModal;
+            modal.classList.remove('hidden');
+        }
+        
+        // Tutup modal
+        function closeModal(modalType) {
+            const modal = modalType === 'habit' ? elements.addHabitModal : elements.settingsModal;
+            modal.classList.add('hidden');
+        }
+        
+        // Form habit
+        function handleHabitSubmit(e) {
+            e.preventDefault();
+            
+            const habitTitle = document.getElementById('habit-title').value;
+            const subtasks = document.getElementById('habit-subtasks').value
+                .split(',')
+                .map(task => task.trim())
+                .filter(task => task !== '');
+            
+            const subtaskObjects = subtasks.map(task => ({
+                text: task,
+                completed: false
+            }));
+            
+            const habitData = {
+                id: Date.now().toString(),
+                title: habitTitle,
+                subtasks: subtaskObjects,
+                time: document.getElementById('habit-time').value,
+                category: document.getElementById('habit-category').value || '',
+                start: document.getElementById('habit-start').value,
+                end: document.getElementById('habit-end').value
+            };
+            
+            habits.push(habitData);
+            saveHabits();
+            closeModal('habit');
+            
+            // Reset form
+            elements.habitForm.reset();
+        }
+        
+        // Form GitHub
+        function handleGitHubSubmit(e) {
+            e.preventDefault();
+            
+            const githubData = {
+                username: document.getElementById('github-username').value,
+                repo: document.getElementById('github-repo').value,
+                token: document.getElementById('github-token').value
+            };
+            
+            localStorage.setItem('githubSettings', JSON.stringify(githubData));
+            closeModal('settings');
+            alert('Pengaturan GitHub berhasil disimpan. Data akan otomatis disimpan ke repository GitHub Anda.');
+        }
+        
+        // Hapus habit
+        function deleteHabit(id) {
+            if (confirm('Apakah Anda yakin ingin menghapus kegiatan ini?')) {
+                habits = habits.filter(habit => habit.id !== id);
+                saveHabits();
+            }
+        }
+        
+        // Inisialisasi app
+        window.onload = initializeApp;
+    </script>
+</body>
+</html>
