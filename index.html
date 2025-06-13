@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NatureFlow - Habit Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        },
+                        dark: {
+                            900: '#0a100f',
+                            800: '#121e1c',
+                            700: '#1a2c29',
+                            600: '#223b38'
+                        },
+                        nature: {
+                            leaf: '#5db376',
+                            tree: '#3a8c5b',
+                            grass: '#2a7d4a'
+                        }
+                    },
+                    fontFamily: {
+                        futura: ['Futura', 'Roboto', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(to bottom, #0a100f, #121e1c);
+            min-height: 100vh;
+            background-attachment: fixed;
+            color: #e0f2f1;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        
+        .nature-bg {
+            background: linear-gradient(135deg, #0a100f 0%, #121e1c 50%, rgba(26, 44, 41, 0.8) 100%);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 
+                        inset 0 -1px 1px rgba(255, 255, 255, 0.1);
+        }
+        
+        .nature-border {
+            border: 1px solid rgba(94, 234, 212, 0.15);
+        }
+        
+        .habit-item {
+            background: linear-gradient(to right, rgba(26, 44, 41, 0.6) 0%, rgba(18, 30, 28, 0.8) 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .habit-item:hover {
+            background: linear-gradient(to right, rgba(26, 44, 41, 0.8) 0%, rgba(18, 30, 28, 1) 100%);
+            transform: translateY(-2px);
+        }
+        
+        .category-badge {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .category-badge::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(120deg, rgba(255,255,255,0.1), transparent);
+            pointer-events: none;
+        }
+        
+        .leaf-icon {
+            color: #5db376;
+        }
+        
+        .leaf-pattern {
+            position: absolute;
+            top: 0;
+            right: 0;
+            opacity: 0.03;
+            font-size: 8rem;
+            transform: rotate(25deg);
+            pointer-events: none;
+        }
+        
+        .task-item {
+            background: rgba(18, 30, 28, 0.4);
+            border-left: 3px solid #2dd4bf;
+        }
+        
+        .modal-overlay {
+            background-color: rgba(10, 16, 15, 0.9);
+        }
+        
+        input:checked + .custom-checkbox {
+            background-color: #14b8a6;
+            border-color: #14b8a6;
+        }
+        
+        input:checked + .custom-checkbox::after {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 2px;
+            width: 5px;
+            height: 10px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+    </style>
+</head>
+<body class="relative overflow-x-hidden">
+    <!-- Leaf decoration pattern -->
+    <div class="leaf-pattern">
+        <i class="fas fa-leaf"></i>
+    </div>
+    
+    <!-- Header section -->
+    <header class="nature-bg sticky top-0 z-10 py-4 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-leaf text-2xl text-nature-leaf"></i>
+                <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-green-400">NatureFlow</h1>
+            </div>
+            
+            <div class="mt-2 sm:mt-0 flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                <div class="flex items-center">
+                    <i class="far fa-calendar-alt mr-2 text-cyan-400"></i>
+                    <span id="currentDate" class="text-sm sm:text-base">Rabu, 21 Juni 2023</span>
+                </div>
+                <div class="flex items-center">
+                    <i class="far fa-clock mr-2 text-cyan-400"></i>
+                    <span id="currentTime" class="text-sm sm:text-base">10:45:27</span>
+                </div>
+                <button id="resetButton" class="px-3 py-1 bg-green-700 hover:bg-green-600 rounded-lg text-sm flex items-center transition-colors">
+                    <i class="fas fa-redo mr-2"></i> Reset Checklist
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Statistics Section -->
+        <section class="mb-12">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold flex items-center">
+                    <i class="fas fa-chart-pie mr-2 text-cyan-400"></i> Statistik Kebiasaan
+                </h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="nature-bg nature-border rounded-xl p-6">
+                    <h3 class="text-lg font-medium mb-4">Distribusi Kategori</h3>
+                    <canvas id="categoryChart" class="w-full"></canvas>
+                </div>
+                <div class="nature-bg nature-border rounded-xl p-6">
+                    <h3 class="text-lg font-medium mb-4">Persentase Penyelesaian</h3>
+                    <canvas id="completionChart" class="w-full"></canvas>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Habit List Section -->
+        <section>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-list-check mr-3 text-green-400"></i> Daftar Kebiasaan
+                </h2>
+                <div class="space-x-3">
+                    <button id="addHabitBtn" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-green-600 hover:from-cyan-500 hover:to-green-500 rounded-lg flex items-center transition-all">
+                        <i class="fas fa-plus mr-2"></i> Tambah Kegiatan
+                    </button>
+                    <button id="settingsBtn" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center">
+                        <i class="fas fa-gear mr-2"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="habitsContainer" class="space-y-4">
+                <!-- Habit item examples -->
+                <div class="habit-item nature-border rounded-xl p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-semibold text-lg">Olahraga Pagi</h3>
+                            <div class="flex flex-wrap gap-2 mt-2">
+                                <span class="category-badge px-3 py-1 rounded-full text-xs bg-gradient-to-r from-blue-700 to-cyan-800">Pagi</span>
+                                <span class="text-xs text-gray-400 flex items-center"><i class="far fa-clock mr-1"></i> 06:00 - 07:00</span>
+                            </div>
+                        </div>
+                        <button class="delete-btn text-gray-400 hover:text-red-400 p-2">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="mt-4 space-y-2">
+                        <div class="task-item flex items-center px-3 py-2 rounded-lg">
+                            <label class="flex items-center cursor-pointer w-full">
+                                <input type="checkbox" class="hidden" checked>
+                                <span class="custom-checkbox w-5 h-5 border border-gray-500 rounded-md mr-3 relative"></span>
+                                <span class="line-through text-gray-400">Lari 5km</span>
+                            </label>
+                        </div>
+                        <div class="task-item flex items-center px-3 py-2 rounded-lg">
+                            <label class="flex items-center cursor-pointer w-full">
+                                <input type="checkbox" class="hidden">
+                                <span class="custom-checkbox w-5 h-5 border border-gray-500 rounded-md mr-3 relative"></span>
+                                <span>Push-up 3 set</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="habit-item nature-border rounded-xl p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-semibold text-lg">Membaca Buku</h3>
+                            <div class="flex flex-wrap gap-2 mt-2">
+                                <span class="category-badge px-3 py-1 rounded-full text-xs bg-gradient-to-r from-purple-700 to-indigo-800">Malam</span>
+                                <span class="text-xs text-gray-400 flex items-center"><i class="far fa-clock mr-1"></i> 20:00 - 21:00</span>
+                            </div>
+                        </div>
+                        <button class="delete-btn text-gray-400 hover:text-red-400 p-2">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="mt-4 space-y-2">
+                        <div class="task-item flex items-center px-3 py-2 rounded-lg">
+                            <label class="flex items-center cursor-pointer w-full">
+                                <input type="checkbox" class="hidden" checked>
+                                <span class="custom-checkbox w-5 h-5 border border-gray-500 rounded-md mr-3 relative"></span>
+                                <span class="line-through text-gray-400">Baca 30 menit</span>
+                            </label>
+                        </div>
+                        <div class="task-item flex items-center px-3 py-2 rounded-lg">
+                            <label class="flex items-center cursor-pointer w-full">
+                                <input type="checkbox" class="hidden" checked>
+                                <span class="custom-checkbox w-5 h-5 border border-gray-500 rounded-md mr-3 relative"></span>
+                                <span class="line-through text-gray-400">Catat poin penting</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Add Habit Modal -->
+    <div id="addHabitModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="relative w-11/12 md:w-2/3 lg:w-1/2 nature-bg nature-border rounded-xl p-6 max-h-[90vh] overflow-y-auto">
+            <button class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-plus-circle mr-3 text-green-400"></i> Tambah Kegiatan Baru
+            </h2>
+            
+            <form id="habitForm" class="space-y-6">
+                <div>
+                    <label for="habitTitle" class="block mb-2">Judul Kegiatan</label>
+                    <input type="text" id="habitTitle" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-transparent" placeholder="Contoh: Olahraga Pagi" required>
+                </div>
+                
+                <div>
+                    <label class="block mb-2">Daftar Kegiatan</label>
+                    <div id="tasksContainer" class="space-y-3">
+                        <div class="flex items-center">
+                            <input type="text" class="flex-grow bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-transparent" placeholder="Masukkan kegiatan">
+                            <button type="button" class="ml-2 p-3 bg-cyan-800 hover:bg-cyan-700 rounded-lg">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="habitCategory" class="block mb-2">Kategori</label>
+                        <select id="habitCategory" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+                            <option value="subuh">Subuh</option>
+                            <option value="pagi">Pagi</option>
+                            <option value="siang">Siang</option>
+                            <option value="sore">Sore</option>
+                            <option value="malam">Malam</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="habitTime" class="block mb-2">Waktu</label>
+                        <div class="flex space-x-3">
+                            <div class="flex-1">
+                                <label for="startTime" class="text-xs text-gray-400">Mulai</label>
+                                <input type="time" id="startTime" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+                            </div>
+                            <div class="flex-1">
+                                <label for="endTime" class="text-xs text-gray-400">Selesai</label>
+                                <input type="time" id="endTime" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">Batal</button>
+                    <button type="submit" class="px-6 py-2 bg-gradient-to-r from-cyan-600 to-green-600 hover:from-cyan-500 hover:to-green-500 rounded-lg">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="relative w-11/12 md:w-2/3 lg:w-1/2 nature-bg nature-border rounded-xl p-6">
+            <button class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-github mr-3"></i> Pengaturan GitHub
+            </h2>
+            
+            <form id="githubForm" class="space-y-6">
+                <div>
+                    <label for="githubUsername" class="block mb-2">Username GitHub</label>
+                    <input type="text" id="githubUsername" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-transparent" placeholder="Masukkan username GitHub" required>
+                </div>
+                
+                <div>
+                    <label for="repositoryName" class="block mb-2">Nama Repository</label>
+                    <input type="text" id="repositoryName" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-transparent" placeholder="Masukkan nama repository" required>
+                </div>
+                
+                <div>
+                    <label for="githubToken" class="block mb-2">Token PAT (Personal Access Token)</label>
+                    <input type="password" id="githubToken" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-transparent" placeholder="Masukkan token akses pribadi" required>
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">Batal</button>
+                    <button type="submit" class="px-6 py-2 bg-gradient-to-r from-cyan-600 to-green-600 hover:from-cyan-500 hover:to-green-500 rounded-lg">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Function to update the date and time in real-time
+        function updateDateTime() {
+            const now = new Date();
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            
+            const dayName = days[now.getDay()];
+            const date = now.getDate();
+            const monthName = months[now.getMonth()];
+            const year = now.getFullYear();
+            
+            let hours = now.getHours();
+            let minutes = now.getMinutes();
+            let seconds = now.getSeconds();
+            
+            // Format to have leading zeros
+            hours = hours < 10 ? '0' + hours : hours;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            seconds = seconds < 10 ? '0' + seconds : seconds;
+            
+            const dateString = `${dayName}, ${date} ${monthName} ${year}`;
+            const timeString = `${hours}:${minutes}:${seconds}`;
+            
+            document.getElementById('currentDate').textContent = dateString;
+            document.getElementById('currentTime').textContent = timeString;
+        }
+        
+        // Initialize and update every second
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+        
+        // Show add habit modal
+        document.getElementById('addHabitBtn').addEventListener('click', function() {
+            document.getElementById('addHabitModal').classList.remove('hidden');
+        });
+        
+        // Show settings modal
+        document.getElementById('settingsBtn').addEventListener('click', function() {
+            document.getElementById('settingsModal').classList.remove('hidden');
+        });
+        
+        // Close modals
+        document.querySelectorAll('#addHabitModal button, #settingsModal button').forEach(button => {
+            if(button.textContent.includes('Batal') || button.innerHTML.includes('fa-times')) {
+                button.addEventListener('click', function() {
+                    document.getElementById('addHabitModal').classList.add('hidden');
+                    document.getElementById('settingsModal').classList.add('hidden');
+                });
+            }
+        });
+        
+        // Add task field in habit form
+        document.querySelector('#tasksContainer button').addEventListener('click', function() {
+            const newTaskField = document.createElement('div');
+            newTaskField.className = 'flex items-center';
+            newTaskField.innerHTML = `
+                <input type="text" class="flex-grow bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-transparent" placeholder="Masukkan kegiatan">
+                <button type="button" class="ml-2 p-3 bg-red-800 hover:bg-red-700 rounded-lg">
+                    <i class="fas fa-minus"></i>
+                </button>
+            `;
+            
+            // Add event to remove button
+            newTaskField.querySelector('button').addEventListener('click', function() {
+                newTaskField.remove();
+            });
+            
+            document.getElementById('tasksContainer').appendChild(newTaskField);
+        });
+        
+        // Initialize charts
+        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+        const completionCtx = document.getElementById('completionChart').getContext('2d');
+        
+        const categoryChart = new Chart(categoryCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Subuh', 'Pagi', 'Siang', 'Sore', 'Malam'],
+                datasets: [{
+                    data: [15, 25, 20, 15, 25],
+                    backgroundColor: [
+                        'rgba(41, 128, 185, 0.8)',
+                        'rgba(52, 152, 219, 0.8)',
+                        'rgba(26, 188, 156, 0.8)',
+                        'rgba(155, 89, 182, 0.8)',
+                        'rgba(142, 68, 173, 0.8)'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#e0f2f1',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.label}: ${context.parsed}%`;
+                            }
+                        }
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+        
+        const completionChart = new Chart(completionCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Selesai', 'Belum Selesai'],
+                datasets: [{
+                    data: [65, 35],
+                    backgroundColor: [
+                        'rgba(46, 204, 113, 0.8)',
+                        'rgba(231, 76, 60, 0.8)'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#e0f2f1',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.label}: ${context.parsed}%`;
+                            }
+                        }
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+        
+        // Handle form submissions (placeholder functionality)
+        document.getElementById('habitForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            // Add habit functionality would go here
+            alert('Kegiatan berhasil ditambahkan!');
+            document.getElementById('addHabitModal').classList.add('hidden');
+        });
+        
+        document.getElementById('githubForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            // GitHub settings save functionality would go here
+            alert('Pengaturan GitHub berhasil disimpan!');
+            document.getElementById('settingsModal').classList.add('hidden');
+        });
+        
+        // Reset checklist functionality
+        document.getElementById('resetButton').addEventListener('click', function() {
+            const confirmed = confirm('Apakah Anda yakin ingin mereset semua checklist hari ini?');
+            if (confirmed) {
+                // Reset checkboxes functionality would go here
+                document.querySelectorAll('.custom-checkbox').forEach(checkbox => {
+                    checkbox.previousElementSibling.checked = false;
+                    checkbox.nextElementSibling.classList.remove('line-through');
+                    checkbox.nextElementSibling.classList.remove('text-gray-400');
+                });
+                alert('Checklist berhasil direset!');
+            }
+        });
+        
+        // Toggle task completion
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const label = this.nextElementSibling.nextElementSibling;
+                if (this.checked) {
+                    label.classList.add('line-through', 'text-gray-400');
+                } else {
+                    label.classList.remove('line-through', 'text-gray-400');
+                }
+                
+                // Here you would update statistics as well
+            });
+        });
+        
+        // Handle delete habit
+        document.querySelectorAll('.delete-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const confirmed = confirm('Apakah Anda yakin ingin menghapus kebiasaan ini?');
+                if (confirmed) {
+                    this.closest('.habit-item').remove();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
